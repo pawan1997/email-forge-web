@@ -213,30 +213,130 @@ Font sizes for 1080px poster:
 
 Return ONLY the HTML. No explanation. Start with <!DOCTYPE html>.`;
 
-// 3 distinct poster generation strategies for single images
-// Uses EXACT same directives as carousel strategies for visual consistency
-const POSTER_STRATEGIES = [
+// Creative Director prompt - analyzes content and decides best visual approach
+const CREATIVE_DIRECTOR_SYSTEM_PROMPT = `You are a world-class creative director with expertise in graphic design, typography, data visualization, and visual storytelling. You analyze content and decide the BEST visual approach - not generic, not AI-slop, but something a talented human designer would create.
+
+## YOUR ROLE
+Analyze the content and return precise creative direction that will guide another AI to create a stunning poster/carousel.
+
+## CONTENT-AWARE DESIGN DECISIONS
+Based on content type, recommend specific treatments:
+
+### DATA/NUMBERS/STATISTICS
+- Use charts: bar charts (comparison), line charts (trends), pie/donut (proportions)
+- Large number typography with supporting context
+- Visual data callouts, progress bars, stat cards
+- Example: "47% increase" → big bold "47%" with upward arrow, subtle graph background
+
+### BEFORE/AFTER or COMPARISON
+- Split panel layouts (50/50 or 60/40)
+- Left/right or top/bottom comparison
+- Visual contrast (dark vs light, old vs new)
+- Connecting elements showing transformation
+
+### LISTS/STEPS/TIPS
+- Numbered visual hierarchy (1, 2, 3 with icons)
+- Timeline or flowchart layouts
+- Card-based grid systems
+- Icon + text pairings
+
+### QUOTES/THOUGHTS/OPINIONS
+- Typography-dominant design
+- Large quotation marks as design element
+- Minimal supporting elements
+- Author attribution styling
+
+### EVENTS/ANNOUNCEMENTS
+- Date as hero element (large, styled)
+- Urgency indicators (countdown feel)
+- Clear information hierarchy (what, when, where)
+
+### EDUCATIONAL/INFORMATIONAL
+- Infographic elements
+- Icon systems
+- Visual metaphors
+- Clear sections and flow
+
+### PROMOTIONAL/MARKETING
+- Bold color schemes
+- Strong CTAs (if requested)
+- Brand-focused layouts
+- High visual impact
+
+## OUTPUT FORMAT
+Return a JSON object with your creative direction:
+{
+  "contentType": "data|comparison|list|quote|event|educational|promotional|other",
+  "concept": "One-sentence visual concept description",
+  "layout": "Specific layout recommendation with positioning details",
+  "colorScheme": {
+    "background": "#hex or gradient description",
+    "primary": "#hex for main text/elements",
+    "accent": "#hex for highlights",
+    "mood": "dark/light/vibrant"
+  },
+  "typography": {
+    "headlineFont": "Specific Google Font name",
+    "headlineSize": "Size in px for 1080px canvas",
+    "bodyFont": "Font for secondary text",
+    "style": "bold/elegant/playful/minimal"
+  },
+  "specialElements": ["List of specific visual elements to include"],
+  "cssEffects": ["Any CSS effects: gradients, shadows, patterns, etc."],
+  "avoidPatterns": ["Things NOT to do for this content"]
+}
+
+Be SPECIFIC. Don't say "use nice colors" - say "use #1a1a2e background with #feca57 accent for a premium dark feel".`;
+
+// 3 poster generation strategies
+// A & B: Reference-based (two unique interpretations from the same reference)
+// C: AI Creative Director decides the best approach based on content type
+interface PosterStrategy {
+  name: string;
+  type: 'reference' | 'creative';
+  directive: string;
+}
+
+const POSTER_STRATEGIES: PosterStrategy[] = [
   {
-    name: 'reference-based',
-    directive: 'Follow the reference image style closely if provided. Match colors, typography, and visual approach. BRANDING: Include creator photo (small circle, 40-50px) and name in bottom corner.',
+    name: 'reference-faithful',
+    type: 'reference',
+    directive: `REFERENCE IMAGE ANALYSIS - FAITHFUL INTERPRETATION
+
+Study the reference image carefully and create a poster that CAPTURES ITS ESSENCE:
+
+1. COLOR PALETTE: Extract and use the exact color palette from the reference
+2. TYPOGRAPHY STYLE: Match the font weight, style, and hierarchy shown
+3. LAYOUT STRUCTURE: Follow similar composition and spacing
+4. VISUAL MOOD: Recreate the same emotional feel (premium, bold, minimal, etc.)
+5. DESIGN ELEMENTS: Use similar patterns, textures, or effects if present
+
+ADAPTATION: Apply the reference's visual language to THIS specific content.
+The poster should feel like it could be from the same design series.
+
+BRANDING: Creator photo (circular, 40-50px) + name in bottom corner. REQUIRED.`,
   },
   {
-    name: 'editorial-dark',
-    directive: `Magazine editorial style on dark background (#0a0a0a or #111).
-TYPOGRAPHY: Large serif headline (Playfair Display or Cormorant), clean sans body text.
-LAYOUT: Generous whitespace, asymmetric composition, elegant spacing.
-ACCENT: One warm accent color (gold #d4af37, coral #ff6b6b, or amber #f59e0b).
-BRANDING: Creator photo (circular, 40-50px) + name + @handle in bottom-left or bottom-right corner. This is REQUIRED on every slide.
-AESTHETIC: Think Vogue, The New Yorker, luxury magazine covers.`,
+    name: 'reference-remix',
+    type: 'reference',
+    directive: `REFERENCE IMAGE ANALYSIS - CREATIVE REMIX
+
+Study the reference image and create a FRESH INTERPRETATION:
+
+1. EXTRACT 2-3 KEY ELEMENTS: Pick standout aspects (a color, a font treatment, a layout concept)
+2. REMIX CREATIVELY: Use these elements as inspiration, not a template
+3. ADD YOUR TWIST: Introduce one new design element that complements
+4. DIFFERENT COMPOSITION: Try an alternative layout while keeping the vibe
+5. EVOLVE THE STYLE: Make it feel like a creative evolution, not a copy
+
+The result should be recognizably inspired by the reference but distinctly different.
+
+BRANDING: Creator photo (circular, 40-50px) + name in bottom corner. REQUIRED.`,
   },
   {
-    name: 'light-minimal',
-    directive: `Clean, airy design on white/cream/off-white background.
-TYPOGRAPHY: Modern sans-serif (Space Grotesk, Outfit), strong weight contrast.
-LAYOUT: Centered or left-aligned, plenty of breathing room, 60px+ padding.
-ACCENT: One muted accent (sage green, dusty rose, slate blue).
-BRANDING: Creator photo (circular, 40-50px) + name in corner. Required on ALL slides.
-AESTHETIC: Think Apple keynotes, Notion marketing, clean SaaS design.`,
+    name: 'ai-creative-director',
+    type: 'creative',
+    directive: '', // Dynamically filled by the Creative Director orchestrator
   },
 ];
 
@@ -264,29 +364,49 @@ const CAROUSEL_SYSTEM_PROMPT = `You create individual slides for Instagram/Linke
 
 Return a JSON array of HTML strings, one per slide.`;
 
-// 3 distinct carousel style strategies - each generates ONLY first slide initially
-const CAROUSEL_STRATEGIES = [
+// 3 carousel strategies matching poster strategies
+// A & B: Reference-based (two unique interpretations)
+// C: AI Creative Director decides the best approach
+interface CarouselStrategy {
+  name: string;
+  type: 'reference' | 'creative';
+  directive: string;
+}
+
+const CAROUSEL_STRATEGIES: CarouselStrategy[] = [
   {
-    name: 'reference-based',
-    directive: 'Follow the reference image style closely if provided. Match colors, typography, and visual approach. BRANDING: Include creator photo (small circle, 40-50px) and name in bottom corner.',
+    name: 'reference-faithful',
+    type: 'reference',
+    directive: `REFERENCE IMAGE ANALYSIS - FAITHFUL INTERPRETATION
+
+Study the reference image and create carousel slides that CAPTURE ITS ESSENCE:
+
+1. COLOR PALETTE: Extract and use the exact color palette from the reference
+2. TYPOGRAPHY STYLE: Match the font weight, style, and hierarchy shown
+3. LAYOUT STRUCTURE: Follow similar composition and spacing
+4. VISUAL MOOD: Recreate the same emotional feel across all slides
+5. CONSISTENCY: All slides should feel like a cohesive series
+
+BRANDING: Creator photo (circular, 40-50px) + name in bottom corner on EVERY slide.`,
   },
   {
-    name: 'editorial-dark',
-    directive: `Magazine editorial style on dark background (#0a0a0a or #111).
-TYPOGRAPHY: Large serif headline (Playfair Display or Cormorant), clean sans body text.
-LAYOUT: Generous whitespace, asymmetric composition, elegant spacing.
-ACCENT: One warm accent color (gold #d4af37, coral #ff6b6b, or amber #f59e0b).
-BRANDING: Creator photo (circular, 40-50px) + name + @handle in bottom-left or bottom-right corner. This is REQUIRED on every slide.
-AESTHETIC: Think Vogue, The New Yorker, luxury magazine covers.`,
+    name: 'reference-remix',
+    type: 'reference',
+    directive: `REFERENCE IMAGE ANALYSIS - CREATIVE REMIX
+
+Study the reference image and create a FRESH carousel series:
+
+1. EXTRACT KEY ELEMENTS: Pick 2-3 standout aspects from the reference
+2. REMIX CREATIVELY: Use these as inspiration, not a template
+3. ADD YOUR TWIST: Introduce complementary design elements
+4. SERIES COHESION: All slides should feel connected but fresh
+
+BRANDING: Creator photo (circular, 40-50px) + name in bottom corner on EVERY slide.`,
   },
   {
-    name: 'light-minimal',
-    directive: `Clean, airy design on white/cream/off-white background.
-TYPOGRAPHY: Modern sans-serif (Space Grotesk, Outfit), strong weight contrast.
-LAYOUT: Centered or left-aligned, plenty of breathing room, 60px+ padding.
-ACCENT: One muted accent (sage green, dusty rose, slate blue).
-BRANDING: Creator photo (circular, 40-50px) + name in corner. Required on ALL slides.
-AESTHETIC: Think Apple keynotes, Notion marketing, clean SaaS design.`,
+    name: 'ai-creative-director',
+    type: 'creative',
+    directive: '', // Dynamically filled by the Creative Director orchestrator
   },
 ];
 
@@ -369,7 +489,7 @@ function buildFirstSlidePrompt(
   profile: { display_name: string; username: string; bio: string; profile_pic: string },
   dimensions: { width: number; height: number },
   totalSlides: number,
-  strategy: typeof CAROUSEL_STRATEGIES[0],
+  strategy: CarouselStrategy,
   hasReferenceImage: boolean
 ): string {
   let text = `Create the FIRST SLIDE of a ${totalSlides}-slide carousel. Dimensions: ${dimensions.width}x${dimensions.height}px.
@@ -386,10 +506,10 @@ STYLE DIRECTION: ${strategy.directive}
 
 This is slide 1 of ${totalSlides}. Make it a strong hook that grabs attention.`;
 
-  if (hasReferenceImage && strategy.name === 'reference-based') {
+  if (hasReferenceImage && strategy.type === 'reference') {
     text += `\n\nREFERENCE IMAGE PROVIDED: Use it for visual style inspiration (colors, typography, layout).`;
-  } else if (strategy.name !== 'reference-based') {
-    text += `\n\nIGNORE any reference image. Follow the style direction above.`;
+  } else if (strategy.type === 'creative') {
+    text += `\n\nNO reference image for this variant. Follow the creative direction above precisely.`;
   }
 
   return text;
@@ -400,7 +520,7 @@ function buildSinglePosterPrompt(
   prompt: string,
   profile: { display_name: string; username: string; profile_pic: string },
   dimensions: { width: number; height: number },
-  strategy: typeof POSTER_STRATEGIES[0],
+  strategy: PosterStrategy,
   hasReferenceImage: boolean
 ): string {
   let text = `Create a single poster. Dimensions: ${dimensions.width}x${dimensions.height}px.
@@ -417,10 +537,10 @@ STYLE DIRECTION: ${strategy.directive}
 
 Make it visually striking and memorable.`;
 
-  if (hasReferenceImage && strategy.name === 'reference-based') {
+  if (hasReferenceImage && strategy.type === 'reference') {
     text += `\n\nREFERENCE IMAGE PROVIDED: Use it for visual style inspiration (colors, typography, layout).`;
-  } else if (strategy.name !== 'reference-based') {
-    text += `\n\nIGNORE any reference image. Follow the style direction above.`;
+  } else if (strategy.type === 'creative') {
+    text += `\n\nNO reference image for this variant. Follow the creative direction above precisely.`;
   }
 
   return text;
@@ -638,6 +758,126 @@ async function callOpenRouter(
   return data.choices[0]?.message?.content || '';
 }
 
+// Creative Director orchestrator - analyzes content and returns design direction
+interface CreativeDirection {
+  contentType: string;
+  concept: string;
+  layout: string;
+  colorScheme: {
+    background: string;
+    primary: string;
+    accent: string;
+    mood: string;
+  };
+  typography: {
+    headlineFont: string;
+    headlineSize: string;
+    bodyFont: string;
+    style: string;
+  };
+  specialElements: string[];
+  cssEffects: string[];
+  avoidPatterns: string[];
+}
+
+async function getCreativeDirection(
+  apiKey: string,
+  model: string,
+  prompt: string
+): Promise<CreativeDirection | null> {
+  try {
+    console.log('Getting creative direction from AI...');
+
+    const userPrompt = `Analyze this poster/carousel request and provide creative direction:
+
+"${prompt}"
+
+Return ONLY a valid JSON object with your creative direction. No explanation, just JSON.`;
+
+    const response = await callOpenRouter(
+      apiKey,
+      model,
+      CREATIVE_DIRECTOR_SYSTEM_PROMPT,
+      userPrompt,
+      undefined,
+      2000 // Smaller token limit for direction
+    );
+
+    // Parse JSON from response
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const direction = JSON.parse(jsonMatch[0]) as CreativeDirection;
+      console.log('Creative direction received:', direction.contentType, direction.concept);
+      return direction;
+    }
+
+    console.warn('Could not parse creative direction JSON');
+    return null;
+  } catch (error) {
+    console.error('Creative direction failed:', error);
+    return null;
+  }
+}
+
+// Convert CreativeDirection to a detailed prompt directive
+function buildCreativeDirective(direction: CreativeDirection): string {
+  return `AI CREATIVE DIRECTOR'S VISION
+
+CONTENT TYPE: ${direction.contentType}
+CONCEPT: ${direction.concept}
+
+LAYOUT: ${direction.layout}
+
+COLOR SCHEME:
+- Background: ${direction.colorScheme.background}
+- Primary text/elements: ${direction.colorScheme.primary}
+- Accent color: ${direction.colorScheme.accent}
+- Mood: ${direction.colorScheme.mood}
+
+TYPOGRAPHY:
+- Headline: ${direction.typography.headlineFont} at ${direction.typography.headlineSize}
+- Body: ${direction.typography.bodyFont}
+- Style: ${direction.typography.style}
+
+SPECIAL ELEMENTS TO INCLUDE:
+${direction.specialElements.map(e => `- ${e}`).join('\n')}
+
+CSS EFFECTS TO USE:
+${direction.cssEffects.map(e => `- ${e}`).join('\n')}
+
+AVOID THESE PATTERNS:
+${direction.avoidPatterns.map(e => `- ${e}`).join('\n')}
+
+BRANDING: Creator photo (circular, 40-50px) + name in bottom corner. REQUIRED.
+
+Execute this creative vision with precision. Make it distinctive and memorable.`;
+}
+
+// Fallback directive if Creative Director fails
+const FALLBACK_CREATIVE_DIRECTIVE = `SMART CONTENT-AWARE DESIGN
+
+Analyze the content and choose the BEST visual approach:
+
+1. IF DATA/NUMBERS → Use visual data representation (charts, large numbers, progress indicators)
+2. IF COMPARISON → Use split layout, before/after design
+3. IF LIST/TIPS → Use numbered visual hierarchy, icons
+4. IF QUOTE → Typography-focused, minimal design
+5. IF EVENT → Bold date treatment, urgency design
+6. IF EDUCATIONAL → Infographic style, clear hierarchy
+
+Choose one strong color palette:
+- Dark premium: #0a0a0a background, white text, one warm accent
+- Light minimal: #fafafa background, dark text, one muted accent
+- Bold vibrant: Strong background color with contrasting text
+
+Typography: Pick ONE font family. Use weight for hierarchy.
+- Headlines: 60-120px for impact
+- Body: 18-24px for readability
+
+BRANDING: Creator photo (circular, 40-50px) + name in bottom corner. REQUIRED.
+
+Make it look like a professional designer created it, not an AI.`;
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -667,9 +907,14 @@ export async function POST(request: NextRequest) {
 
     const hasReferenceImage = !!referenceImage;
 
-    // Use OpenRouter with Gemini 3 Pro
+    // Use OpenRouter with selected model (default to Gemini 3 Pro)
     const apiKey = body.openRouterApiKey || OPENROUTER_API_KEY;
-    const model = 'google/gemini-3-pro-preview'; // Best quality with vision
+    const selectedModel = body.model || 'pro'; // 'pro' or 'flash'
+    const model = selectedModel === 'flash'
+      ? 'google/gemini-2.5-flash-preview-05-20'
+      : 'google/gemini-2.5-pro-preview-06-05';
+
+    console.log('Using model:', model, '(selected:', selectedModel, ')');
 
     // Helper to clean HTML response
     const cleanHtml = (html: string): string => {
@@ -681,8 +926,9 @@ export async function POST(request: NextRequest) {
       return html;
     };
 
-    // CAROUSEL MODE - Generate only FIRST SLIDE for each of 4 style variants
-    // User picks their favorite, then we complete the rest (saves tokens!)
+    // CAROUSEL MODE - Generate only FIRST SLIDE for each of 3 style variants
+    // A & B: Reference-based interpretations
+    // C: AI Creative Director decides the best approach
     if (config.mode === 'carousel') {
       const slideCount = config.carouselSlides || 5;
 
@@ -693,20 +939,45 @@ export async function POST(request: NextRequest) {
         profile_pic: profile.profile_pic,
       };
 
+      // Get Creative Director's vision for variant C (runs in parallel with A & B)
+      const creativeDirectionPromise = getCreativeDirection(apiKey, model, config.prompt);
+
+      // Prepare strategies with Creative Director's directive for variant C
+      const prepareStrategies = async (): Promise<CarouselStrategy[]> => {
+        const strategies = [...CAROUSEL_STRATEGIES];
+        const direction = await creativeDirectionPromise;
+
+        // Update the ai-creative-director strategy with actual directive
+        const creativeIdx = strategies.findIndex(s => s.name === 'ai-creative-director');
+        if (creativeIdx !== -1) {
+          strategies[creativeIdx] = {
+            ...strategies[creativeIdx],
+            directive: direction
+              ? buildCreativeDirective(direction)
+              : FALLBACK_CREATIVE_DIRECTIVE,
+          };
+        }
+
+        return strategies;
+      };
+
+      const strategies = await prepareStrategies();
+
       // Generate first slide for each strategy in parallel
-      const firstSlidePromises = CAROUSEL_STRATEGIES.map(async (strategy, index) => {
+      const firstSlidePromises = strategies.map(async (strategy, index) => {
         try {
+          // For reference-based strategies, use the reference image
+          // For creative strategy, don't use reference (let AI decide)
+          const useRef = hasReferenceImage && strategy.type === 'reference';
+
           const promptText = buildFirstSlidePrompt(
             config.prompt,
             profileForCarousel,
             dimensions,
             slideCount,
             strategy,
-            hasReferenceImage
+            hasReferenceImage && strategy.type === 'reference'
           );
-
-          // Only pass reference image for reference-based strategy
-          const useRef = hasReferenceImage && strategy.name === 'reference-based';
 
           let html = await callOpenRouter(
             apiKey,
@@ -757,17 +1028,43 @@ export async function POST(request: NextRequest) {
     }
 
     // SINGLE MODE - Generate 3 diverse posters in parallel
-    // Uses same strategy directives as carousel for visual consistency
+    // A & B: Reference-based interpretations
+    // C: AI Creative Director decides the best approach
     const profileForPoster = {
       display_name: profile.display_name,
       username: profile.username,
       profile_pic: profile.profile_pic,
     };
 
-    const posterPromises = POSTER_STRATEGIES.map(async (strategy, index) => {
+    // Get Creative Director's vision for variant C
+    const creativeDirectionPromise = getCreativeDirection(apiKey, model, config.prompt);
+
+    // Prepare strategies with Creative Director's directive for variant C
+    const prepareStrategies = async (): Promise<PosterStrategy[]> => {
+      const strategies = [...POSTER_STRATEGIES];
+      const direction = await creativeDirectionPromise;
+
+      // Update the ai-creative-director strategy with actual directive
+      const creativeIdx = strategies.findIndex(s => s.name === 'ai-creative-director');
+      if (creativeIdx !== -1) {
+        strategies[creativeIdx] = {
+          ...strategies[creativeIdx],
+          directive: direction
+            ? buildCreativeDirective(direction)
+            : FALLBACK_CREATIVE_DIRECTIVE,
+        };
+      }
+
+      return strategies;
+    };
+
+    const strategies = await prepareStrategies();
+
+    const posterPromises = strategies.map(async (strategy, index) => {
       try {
-        // Only pass reference image for reference-based strategy (first one)
-        const useRef = hasReferenceImage && strategy.name === 'reference-based';
+        // For reference-based strategies, use the reference image
+        // For creative strategy, don't use reference (let AI decide)
+        const useRef = hasReferenceImage && strategy.type === 'reference';
 
         // Build prompt using same structure as carousel
         const promptText = buildSinglePosterPrompt(
@@ -775,7 +1072,7 @@ export async function POST(request: NextRequest) {
           profileForPoster,
           dimensions,
           strategy,
-          hasReferenceImage
+          hasReferenceImage && strategy.type === 'reference'
         );
 
         let html = await callOpenRouter(

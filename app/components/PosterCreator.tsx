@@ -23,6 +23,7 @@ export default function PosterCreator({ onBack }: PosterCreatorProps) {
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
   const [mode, setMode] = useState<PosterMode>('single');
   const [slideCount, setSlideCount] = useState(5);
+  const [selectedModel, setSelectedModel] = useState<'pro' | 'flash'>('pro');
 
   // Generation state
   const [isLoading, setIsLoading] = useState(false);
@@ -105,6 +106,7 @@ export default function PosterCreator({ onBack }: PosterCreatorProps) {
         body: JSON.stringify({
           config,
           referenceImage: referenceImage || undefined,
+          model: selectedModel, // 'pro' or 'flash'
         }),
       });
 
@@ -472,6 +474,41 @@ export default function PosterCreator({ onBack }: PosterCreatorProps) {
               )}
             </div>
 
+            {/* Model Selection */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <label className="block text-sm font-medium text-slate-700 mb-3">
+                AI Model
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSelectedModel('pro')}
+                  className={`flex-1 py-2.5 px-4 rounded-lg font-medium text-sm transition-all ${
+                    selectedModel === 'pro'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <div className="flex flex-col items-center">
+                    <span>Gemini 2.5 Pro</span>
+                    <span className="text-xs opacity-75">Best quality</span>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setSelectedModel('flash')}
+                  className={`flex-1 py-2.5 px-4 rounded-lg font-medium text-sm transition-all ${
+                    selectedModel === 'flash'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <div className="flex flex-col items-center">
+                    <span>Gemini 2.5 Flash</span>
+                    <span className="text-xs opacity-75">Faster</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+
             {/* Generate Button */}
             <button
               onClick={handleGenerate}
@@ -484,10 +521,10 @@ export default function PosterCreator({ onBack }: PosterCreatorProps) {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  {mode === 'carousel' ? `Generating 4 variants × ${slideCount} slides...` : 'Generating 4 variations...'}
+                  {mode === 'carousel' ? `Generating 3 variants...` : 'Generating 3 variations...'}
                 </span>
               ) : (
-                mode === 'carousel' ? `Generate ${slideCount}-Slide Carousel (4 variants)` : 'Generate Posters'
+                mode === 'carousel' ? `Generate ${slideCount}-Slide Carousel` : 'Generate Posters'
               )}
             </button>
 
