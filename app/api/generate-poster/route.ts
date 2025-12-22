@@ -911,8 +911,8 @@ export async function POST(request: NextRequest) {
     const apiKey = body.openRouterApiKey || OPENROUTER_API_KEY;
     const selectedModel = body.model || 'pro'; // 'pro' or 'flash'
     const model = selectedModel === 'flash'
-      ? 'google/gemini-2.5-flash-preview-05-20'
-      : 'google/gemini-2.5-pro-preview-06-05';
+      ? 'google/gemini-3-flash-preview'
+      : 'google/gemini-3-pro-preview';
 
     console.log('Using model:', model, '(selected:', selectedModel, ')');
 

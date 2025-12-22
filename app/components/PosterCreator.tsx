@@ -489,7 +489,7 @@ export default function PosterCreator({ onBack }: PosterCreatorProps) {
                   }`}
                 >
                   <div className="flex flex-col items-center">
-                    <span>Gemini 2.5 Pro</span>
+                    <span>Gemini 3 Pro</span>
                     <span className="text-xs opacity-75">Best quality</span>
                   </div>
                 </button>
@@ -502,7 +502,7 @@ export default function PosterCreator({ onBack }: PosterCreatorProps) {
                   }`}
                 >
                   <div className="flex flex-col items-center">
-                    <span>Gemini 2.5 Flash</span>
+                    <span>Gemini 3 Flash</span>
                     <span className="text-xs opacity-75">Faster</span>
                   </div>
                 </button>
