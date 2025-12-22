@@ -1,18 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import puppeteerCore from 'puppeteer-core';
 import puppeteer from 'puppeteer';
-import chromium from '@sparticuz/chromium';
+import chromium from '@sparticuz/chromium-min';
 import { PDFDocument } from 'pdf-lib';
 
 // Check if running in production/serverless environment
 const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL;
 
+// Remote chromium binary URL (hosted by Sparticuz)
+const CHROMIUM_URL = 'https://github.com/nichochar/chromium-binaries/releases/download/v131.0.0/chromium-v131.0.0-pack.tar';
+
 async function getBrowser() {
   if (isProduction) {
-    // Use @sparticuz/chromium for serverless (Vercel)
+    // Use @sparticuz/chromium-min with remote binary for serverless (Vercel)
+    const executablePath = await chromium.executablePath(CHROMIUM_URL);
+
     return puppeteerCore.launch({
       args: chromium.args,
-      executablePath: await chromium.executablePath(),
+      executablePath,
       headless: true,
     });
   } else {
