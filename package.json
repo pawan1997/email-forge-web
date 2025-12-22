@@ -9,9 +9,15 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.2",
+    "@sparticuz/chromium": "^143.0.0",
     "next": "16.0.10",
+    "pdf-lib": "^1.17.1",
+    "puppeteer": "^24.34.0",
+    "puppeteer-core": "^24.34.0",
     "react": "19.2.1",
-    "react-dom": "19.2.1"
+    "react-dom": "19.2.1",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
