@@ -7,8 +7,8 @@ import { PDFDocument } from 'pdf-lib';
 // Check if running in production/serverless environment
 const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL;
 
-// Remote chromium binary URL (hosted by Sparticuz)
-const CHROMIUM_URL = 'https://github.com/nichochar/chromium-binaries/releases/download/v131.0.0/chromium-v131.0.0-pack.tar';
+// Remote chromium binary URL - using official Sparticuz release (must match @sparticuz/chromium-min version)
+const CHROMIUM_URL = 'https://github.com/Sparticuz/chromium/releases/download/v143.0.0/chromium-v143.0.0-pack.x64.tar';
 
 async function getBrowser() {
   if (isProduction) {
