@@ -213,26 +213,32 @@ Font sizes for 1080px poster:
 
 Return ONLY the HTML. No explanation. Start with <!DOCTYPE html>.`;
 
-// Variation directives for generating diverse outputs (first is the "base" design)
-const VARIATION_DIRECTIVES = [
-  '', // Base design - no extra directive
-  'VARIATION: Flip to opposite theme (if dark, go light. if light, go dark). Keep the same layout structure but change colors and mood.',
-  'VARIATION: Use bolder, more vibrant colors. Make it more energetic and eye-catching while keeping the core message.',
-  'VARIATION: Make it more minimal and editorial. Remove elements, increase whitespace, let typography breathe.',
+// 3 distinct poster generation strategies for single images
+// Uses EXACT same directives as carousel strategies for visual consistency
+const POSTER_STRATEGIES = [
+  {
+    name: 'reference-based',
+    directive: 'Follow the reference image style closely if provided. Match colors, typography, and visual approach. BRANDING: Include creator photo (small circle, 40-50px) and name in bottom corner.',
+  },
+  {
+    name: 'editorial-dark',
+    directive: `Magazine editorial style on dark background (#0a0a0a or #111).
+TYPOGRAPHY: Large serif headline (Playfair Display or Cormorant), clean sans body text.
+LAYOUT: Generous whitespace, asymmetric composition, elegant spacing.
+ACCENT: One warm accent color (gold #d4af37, coral #ff6b6b, or amber #f59e0b).
+BRANDING: Creator photo (circular, 40-50px) + name + @handle in bottom-left or bottom-right corner. This is REQUIRED on every slide.
+AESTHETIC: Think Vogue, The New Yorker, luxury magazine covers.`,
+  },
+  {
+    name: 'light-minimal',
+    directive: `Clean, airy design on white/cream/off-white background.
+TYPOGRAPHY: Modern sans-serif (Space Grotesk, Outfit), strong weight contrast.
+LAYOUT: Centered or left-aligned, plenty of breathing room, 60px+ padding.
+ACCENT: One muted accent (sage green, dusty rose, slate blue).
+BRANDING: Creator photo (circular, 40-50px) + name in corner. Required on ALL slides.
+AESTHETIC: Think Apple keynotes, Notion marketing, clean SaaS design.`,
+  },
 ];
-
-// Lightweight prompt for creating variations from existing HTML
-const VARIATION_SYSTEM_PROMPT = `You adapt existing HTML poster designs into variations.
-
-Given an HTML poster and a variation instruction, create a modified version.
-Keep the same structure and content but change the visual style as instructed.
-
-Rules:
-1. Keep exact same dimensions
-2. Keep same text content
-3. Change colors, backgrounds, typography styling as instructed
-4. Output ONLY HTML starting with <!DOCTYPE html>
-5. No explanation, just the HTML`;
 
 // System prompt for carousel slide generation
 const CAROUSEL_SYSTEM_PROMPT = `You create individual slides for Instagram/LinkedIn carousels. Each slide is a standalone HTML poster that's part of a cohesive series.
@@ -258,51 +264,193 @@ const CAROUSEL_SYSTEM_PROMPT = `You create individual slides for Instagram/Linke
 
 Return a JSON array of HTML strings, one per slide.`;
 
-// Variation directives for carousel (restyling entire carousel sets)
-const CAROUSEL_VARIATION_DIRECTIVES = [
-  '', // Base design
-  'VARIATION: Dark mode with vibrant accent colors. Deep blacks/dark grays with one striking accent color throughout.',
-  'VARIATION: Light and airy. White/cream backgrounds with elegant typography and subtle color accents.',
-  'VARIATION: Bold and energetic. Vibrant background colors, strong contrasts, dynamic feel.',
+// 3 distinct carousel style strategies - each generates ONLY first slide initially
+const CAROUSEL_STRATEGIES = [
+  {
+    name: 'reference-based',
+    directive: 'Follow the reference image style closely if provided. Match colors, typography, and visual approach. BRANDING: Include creator photo (small circle, 40-50px) and name in bottom corner.',
+  },
+  {
+    name: 'editorial-dark',
+    directive: `Magazine editorial style on dark background (#0a0a0a or #111).
+TYPOGRAPHY: Large serif headline (Playfair Display or Cormorant), clean sans body text.
+LAYOUT: Generous whitespace, asymmetric composition, elegant spacing.
+ACCENT: One warm accent color (gold #d4af37, coral #ff6b6b, or amber #f59e0b).
+BRANDING: Creator photo (circular, 40-50px) + name + @handle in bottom-left or bottom-right corner. This is REQUIRED on every slide.
+AESTHETIC: Think Vogue, The New Yorker, luxury magazine covers.`,
+  },
+  {
+    name: 'light-minimal',
+    directive: `Clean, airy design on white/cream/off-white background.
+TYPOGRAPHY: Modern sans-serif (Space Grotesk, Outfit), strong weight contrast.
+LAYOUT: Centered or left-aligned, plenty of breathing room, 60px+ padding.
+ACCENT: One muted accent (sage green, dusty rose, slate blue).
+BRANDING: Creator photo (circular, 40-50px) + name in corner. Required on ALL slides.
+AESTHETIC: Think Apple keynotes, Notion marketing, clean SaaS design.`,
+  },
 ];
 
-// System prompt for creating carousel variations
-const CAROUSEL_VARIATION_SYSTEM_PROMPT = `You adapt existing carousel slides into a new visual style while keeping the same content.
+// System prompt for generating a single carousel first slide (preview)
+const CAROUSEL_FIRST_SLIDE_SYSTEM_PROMPT = `You create the FIRST SLIDE (hook/title slide) for an Instagram/LinkedIn carousel.
 
-Given a set of carousel slides (as JSON array of HTML) and a style direction, recreate the entire carousel with the new style.
+## YOUR TASK
+Create ONE slide that:
+1. Grabs attention immediately
+2. Introduces the topic compellingly
+3. Sets the visual style for the entire carousel
 
-Rules:
-1. Keep EXACT same text content on each slide
-2. Keep same number of slides
-3. Keep same slide structure/layout
-4. Change colors, backgrounds, fonts, effects as directed
-5. Maintain visual consistency across ALL slides
-6. Return a JSON array of HTML strings, one per slide`;
+## DESIGN RULES
+1. Exact dimensions as specified - content must stay within frame
+2. One clear hook/title - easy to read on mobile (minimum 32px font)
+3. 50px minimum padding from all edges - NO text touching edges
+4. Maximum 3-4 text elements on the slide
 
-function buildCarouselVariationPrompt(
-  originalSlides: string[],
-  directive: string,
-  dimensions: { width: number; height: number }
+## BRANDING (REQUIRED)
+You MUST include creator branding on EVERY slide:
+- Circular profile photo (40-50px diameter)
+- Creator name (14-18px)
+- Placement: bottom-left or bottom-right corner
+- This is NOT optional - missing branding is a failure
+
+## OUTPUT
+- Output ONLY HTML starting with <!DOCTYPE html>
+- NO explanation, just the HTML`;
+
+// System prompt for single poster generation - matches carousel aesthetic
+const SINGLE_POSTER_SYSTEM_PROMPT = `You create a stunning single-image poster for Instagram/LinkedIn.
+
+## YOUR TASK
+Create ONE poster that:
+1. Communicates the message clearly and beautifully
+2. Has strong visual impact
+3. Works as a standalone piece
+
+## DESIGN RULES
+1. Exact dimensions as specified - content must stay within frame
+2. Clear headline - easy to read on mobile (minimum 32px font)
+3. 50px minimum padding from all edges - NO text touching edges
+4. Maximum 4-5 text elements on the poster
+
+## BRANDING (REQUIRED)
+You MUST include creator branding:
+- Circular profile photo (40-50px diameter)
+- Creator name (14-18px)
+- Placement: bottom-left or bottom-right corner
+- This is NOT optional - missing branding is a failure
+
+## OUTPUT
+- Output ONLY HTML starting with <!DOCTYPE html>
+- NO explanation, just the HTML`;
+
+// System prompt for completing remaining carousel slides
+const CAROUSEL_COMPLETION_SYSTEM_PROMPT = `You complete a carousel by generating the remaining slides to match an existing first slide.
+
+## YOUR TASK
+Given a first slide and topic, create the remaining slides that:
+1. Match the EXACT visual style of slide 1 (fonts, colors, backgrounds, effects)
+2. Continue the content logically
+3. End with a strong conclusion
+
+## SLIDE STRUCTURE
+- Given: Slide 1 (hook/intro)
+- Generate: Slides 2 to N
+  - Middle slides: Key points, one idea per slide
+  - Last slide: Conclusion/takeaway
+
+## RULES
+1. EXACT same visual style as slide 1
+2. Same fonts, colors, backgrounds
+3. Same branding placement
+4. One idea per slide - mobile readable
+5. Return JSON array of HTML strings (slides 2 to N only)`;
+
+function buildFirstSlidePrompt(
+  prompt: string,
+  profile: { display_name: string; username: string; bio: string; profile_pic: string },
+  dimensions: { width: number; height: number },
+  totalSlides: number,
+  strategy: typeof CAROUSEL_STRATEGIES[0],
+  hasReferenceImage: boolean
 ): string {
-  return `ORIGINAL CAROUSEL SLIDES (${originalSlides.length} slides, each ${dimensions.width}x${dimensions.height}px):
+  let text = `Create the FIRST SLIDE of a ${totalSlides}-slide carousel. Dimensions: ${dimensions.width}x${dimensions.height}px.
 
-${originalSlides.map((html, i) => `SLIDE ${i + 1}:\n\`\`\`html\n${html}\n\`\`\``).join('\n\n')}
+TOPIC/CONTENT:
+"${prompt}"
 
-INSTRUCTION: ${directive}
+CREATOR BRANDING (subtle signature):
+- Name: ${profile.display_name}
+- Photo URL: ${profile.profile_pic}
+- Handle: @${profile.username}
 
-Recreate the entire carousel with the new style. Return a JSON array with ${originalSlides.length} HTML strings:
-["<!DOCTYPE html>...", "<!DOCTYPE html>...", ...]`;
+STYLE DIRECTION: ${strategy.directive}
+
+This is slide 1 of ${totalSlides}. Make it a strong hook that grabs attention.`;
+
+  if (hasReferenceImage && strategy.name === 'reference-based') {
+    text += `\n\nREFERENCE IMAGE PROVIDED: Use it for visual style inspiration (colors, typography, layout).`;
+  } else if (strategy.name !== 'reference-based') {
+    text += `\n\nIGNORE any reference image. Follow the style direction above.`;
+  }
+
+  return text;
 }
 
-function buildVariationPrompt(originalHtml: string, directive: string, dimensions: { width: number; height: number }): string {
-  return `ORIGINAL POSTER HTML (${dimensions.width}x${dimensions.height}px):
+// Build prompt for single poster - mirrors carousel first slide prompt structure
+function buildSinglePosterPrompt(
+  prompt: string,
+  profile: { display_name: string; username: string; profile_pic: string },
+  dimensions: { width: number; height: number },
+  strategy: typeof POSTER_STRATEGIES[0],
+  hasReferenceImage: boolean
+): string {
+  let text = `Create a single poster. Dimensions: ${dimensions.width}x${dimensions.height}px.
+
+TOPIC/CONTENT:
+"${prompt}"
+
+CREATOR BRANDING (subtle signature):
+- Name: ${profile.display_name}
+- Photo URL: ${profile.profile_pic}
+- Handle: @${profile.username}
+
+STYLE DIRECTION: ${strategy.directive}
+
+Make it visually striking and memorable.`;
+
+  if (hasReferenceImage && strategy.name === 'reference-based') {
+    text += `\n\nREFERENCE IMAGE PROVIDED: Use it for visual style inspiration (colors, typography, layout).`;
+  } else if (strategy.name !== 'reference-based') {
+    text += `\n\nIGNORE any reference image. Follow the style direction above.`;
+  }
+
+  return text;
+}
+
+function buildCarouselCompletionPrompt(
+  firstSlideHtml: string,
+  prompt: string,
+  profile: { display_name: string; username: string; profile_pic: string },
+  dimensions: { width: number; height: number },
+  totalSlides: number
+): string {
+  return `FIRST SLIDE HTML (match this style exactly):
 \`\`\`html
-${originalHtml}
+${firstSlideHtml}
 \`\`\`
 
-INSTRUCTION: ${directive}
+CAROUSEL TOPIC: "${prompt}"
 
-Create the variation. Output only HTML starting with <!DOCTYPE html>`;
+CREATOR BRANDING (same placement as slide 1):
+- Name: ${profile.display_name}
+- Photo: ${profile.profile_pic}
+- Handle: @${profile.username}
+
+Generate slides 2 through ${totalSlides}. Each slide is ${dimensions.width}x${dimensions.height}px.
+- Slides 2-${totalSlides - 1}: Key points/content
+- Slide ${totalSlides}: Conclusion
+
+Return a JSON array with ${totalSlides - 1} HTML strings:
+["<!DOCTYPE html>...", "<!DOCTYPE html>...", ...]`;
 }
 
 function buildCarouselPrompt(
@@ -523,16 +671,6 @@ export async function POST(request: NextRequest) {
     const apiKey = body.openRouterApiKey || OPENROUTER_API_KEY;
     const model = 'google/gemini-3-pro-preview'; // Best quality with vision
 
-    const profileData = {
-      display_name: profile.display_name,
-      username: profile.username,
-      bio: profile.bio,
-      profile_pic: profile.profile_pic,
-      total_bookings: profile.total_bookings,
-      average_rating: profile.average_rating,
-      services: profile.services || [],
-    };
-
     // Helper to clean HTML response
     const cleanHtml = (html: string): string => {
       html = html.replace(/```html\n?/g, '').replace(/```\n?/g, '').trim();
@@ -543,153 +681,109 @@ export async function POST(request: NextRequest) {
       return html;
     };
 
-    // CAROUSEL MODE (with 4 variants)
+    // CAROUSEL MODE - Generate only FIRST SLIDE for each of 4 style variants
+    // User picks their favorite, then we complete the rest (saves tokens!)
     if (config.mode === 'carousel') {
       const slideCount = config.carouselSlides || 5;
 
-      // Helper to parse carousel response
-      const parseCarouselResponse = (response: string): string[] => {
-        let slides: string[] = [];
-        try {
-          const jsonMatch = response.match(/\[[\s\S]*\]/);
-          if (jsonMatch) {
-            slides = JSON.parse(jsonMatch[0]);
-          } else {
-            throw new Error('No JSON array found');
-          }
-        } catch {
-          console.warn('JSON parsing failed, attempting fallback split');
-          const parts = response.split(/(?=<!DOCTYPE)/i).filter(p => p.trim().startsWith('<!DOCTYPE'));
-          slides = parts.map(p => cleanHtml(p));
-        }
-        return slides.map(h => cleanHtml(h));
+      const profileForCarousel = {
+        display_name: profile.display_name,
+        username: profile.username,
+        bio: profile.bio,
+        profile_pic: profile.profile_pic,
       };
 
-      // STEP 1: Generate base carousel (with reference image if provided)
-      const carouselPromptText = buildCarouselPrompt(
-        config.prompt,
-        {
-          display_name: profile.display_name,
-          username: profile.username,
-          bio: profile.bio,
-          profile_pic: profile.profile_pic,
-        },
-        dimensions,
-        slideCount,
-        hasReferenceImage
-      );
-
-      const baseResponse = await callOpenRouter(
-        apiKey,
-        model,
-        CAROUSEL_SYSTEM_PROMPT,
-        carouselPromptText,
-        referenceImage,
-        20000
-      );
-
-      const baseSlides = parseCarouselResponse(baseResponse);
-      if (baseSlides.length === 0) {
-        throw new Error('Failed to generate carousel slides');
-      }
-
-      // Create base carousel variant (variant A)
-      const baseCarousel: GeneratedPoster[] = baseSlides.map((html, index) => ({
-        html,
-        dimensions,
-        style: config.style,
-        topmateProfile: profile,
-        generatedAt: new Date().toISOString(),
-        slideIndex: index,
-        variantIndex: 0,
-      }));
-
-      // STEP 2: Generate 3 style variations of the carousel
-      const variationPromises = CAROUSEL_VARIATION_DIRECTIVES.slice(1).map(async (directive, variantIdx) => {
+      // Generate first slide for each strategy in parallel
+      const firstSlidePromises = CAROUSEL_STRATEGIES.map(async (strategy, index) => {
         try {
-          const variationPromptText = buildCarouselVariationPrompt(baseSlides, directive, dimensions);
-
-          const response = await callOpenRouter(
-            apiKey,
-            model,
-            CAROUSEL_VARIATION_SYSTEM_PROMPT,
-            variationPromptText,
-            undefined, // No reference image for variations
-            20000
+          const promptText = buildFirstSlidePrompt(
+            config.prompt,
+            profileForCarousel,
+            dimensions,
+            slideCount,
+            strategy,
+            hasReferenceImage
           );
 
-          const variantSlides = parseCarouselResponse(response);
-          if (variantSlides.length === 0) return null;
+          // Only pass reference image for reference-based strategy
+          const useRef = hasReferenceImage && strategy.name === 'reference-based';
 
-          return variantSlides.map((html, slideIdx) => ({
+          let html = await callOpenRouter(
+            apiKey,
+            model,
+            CAROUSEL_FIRST_SLIDE_SYSTEM_PROMPT,
+            promptText,
+            useRef ? referenceImage : undefined,
+            8000
+          );
+          html = cleanHtml(html);
+
+          return {
             html,
             dimensions,
             style: config.style,
             topmateProfile: profile,
             generatedAt: new Date().toISOString(),
-            slideIndex: slideIdx,
-            variantIndex: variantIdx + 1,
-          })) as GeneratedPoster[];
+            slideIndex: 0,
+            variantIndex: index,
+            strategyName: strategy.name,
+          } as GeneratedPoster;
         } catch (err) {
-          console.error(`Carousel variation ${variantIdx + 1} failed:`, err);
+          console.error(`Carousel first slide ${strategy.name} failed:`, err);
           return null;
         }
       });
 
-      const variationResults = await Promise.all(variationPromises);
-      const validVariations = variationResults.filter((v): v is GeneratedPoster[] => v !== null);
+      const firstSlideResults = await Promise.all(firstSlidePromises);
+      const validFirstSlides = firstSlideResults.filter((p): p is GeneratedPoster => p !== null);
 
-      // Combine all variants: [[base slides], [var1 slides], [var2 slides], [var3 slides]]
-      const allCarousels = [baseCarousel, ...validVariations];
+      if (validFirstSlides.length === 0) {
+        throw new Error('Failed to generate carousel previews');
+      }
+
+      // Return only first slides - each variant has just 1 slide for now
+      // Frontend will show these as previews, user picks one, then calls complete-carousel
+      const carouselPreviews = validFirstSlides.map(slide => [slide]);
 
       return NextResponse.json({
         success: true,
-        carousels: allCarousels, // Array of carousel variants, each containing slides
+        carousels: carouselPreviews, // Array of single-slide arrays (previews only)
         mode: 'carousel',
-        variantCount: allCarousels.length,
-        slideCount: baseSlides.length,
+        previewOnly: true, // Flag to indicate these are previews
+        variantCount: carouselPreviews.length,
+        slideCount: 1, // Only first slide generated
+        totalSlides: slideCount, // How many slides will be in complete carousel
       });
     }
 
-    // SINGLE MODE (with variations)
-    // STEP 1: Generate base poster (with reference image if provided)
-    const basePromptText = buildPrompt(
-      config.prompt,
-      profileData,
-      dimensions,
-      hasReferenceImage,
-      VARIATION_DIRECTIVES[0] // Empty string for base
-    );
-
-    let baseHtml = await callOpenRouter(
-      apiKey,
-      model,
-      POSTER_SYSTEM_PROMPT,
-      basePromptText,
-      referenceImage // Only send image for base poster
-    );
-    baseHtml = cleanHtml(baseHtml);
-
-    const basePoster: GeneratedPoster = {
-      html: baseHtml,
-      dimensions,
-      style: config.style,
-      topmateProfile: profile,
-      generatedAt: new Date().toISOString(),
-      variantIndex: 0,
+    // SINGLE MODE - Generate 3 diverse posters in parallel
+    // Uses same strategy directives as carousel for visual consistency
+    const profileForPoster = {
+      display_name: profile.display_name,
+      username: profile.username,
+      profile_pic: profile.profile_pic,
     };
 
-    // STEP 2: Generate 3 variations from base (no image, smaller prompts)
-    const variationPromises = VARIATION_DIRECTIVES.slice(1).map(async (directive, index) => {
+    const posterPromises = POSTER_STRATEGIES.map(async (strategy, index) => {
       try {
-        const variationPromptText = buildVariationPrompt(baseHtml, directive, dimensions);
+        // Only pass reference image for reference-based strategy (first one)
+        const useRef = hasReferenceImage && strategy.name === 'reference-based';
+
+        // Build prompt using same structure as carousel
+        const promptText = buildSinglePosterPrompt(
+          config.prompt,
+          profileForPoster,
+          dimensions,
+          strategy,
+          hasReferenceImage
+        );
 
         let html = await callOpenRouter(
           apiKey,
           model,
-          VARIATION_SYSTEM_PROMPT,
-          variationPromptText
-          // No reference image - saves tokens!
+          SINGLE_POSTER_SYSTEM_PROMPT,
+          promptText,
+          useRef ? referenceImage : undefined
         );
         html = cleanHtml(html);
 
@@ -699,19 +793,21 @@ export async function POST(request: NextRequest) {
           style: config.style,
           topmateProfile: profile,
           generatedAt: new Date().toISOString(),
-          variantIndex: index + 1,
+          variantIndex: index,
+          strategyName: strategy.name,
         } as GeneratedPoster;
       } catch (err) {
-        console.error(`Variation ${index + 1} failed:`, err);
+        console.error(`Poster strategy ${strategy.name} failed:`, err);
         return null;
       }
     });
 
-    const variationResults = await Promise.all(variationPromises);
-    const variations = variationResults.filter((p): p is GeneratedPoster => p !== null);
+    const posterResults = await Promise.all(posterPromises);
+    const posters = posterResults.filter((p): p is GeneratedPoster => p !== null);
 
-    // Combine base + variations
-    const posters = [basePoster, ...variations];
+    if (posters.length === 0) {
+      throw new Error('All poster generations failed');
+    }
 
     return NextResponse.json({ success: true, posters, mode: 'single' });
 

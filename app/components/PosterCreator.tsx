@@ -26,6 +26,7 @@ export default function PosterCreator({ onBack }: PosterCreatorProps) {
 
   // Generation state
   const [isLoading, setIsLoading] = useState(false);
+  const [isCompletingCarousel, setIsCompletingCarousel] = useState(false);
   const [posters, setPosters] = useState<GeneratedPoster[]>([]);
   const [carousels, setCarousels] = useState<GeneratedPoster[][]>([]); // For carousel: array of variants
   const [selectedVariant, setSelectedVariant] = useState(0); // Which carousel variant (A, B, C, D)
@@ -34,6 +35,9 @@ export default function PosterCreator({ onBack }: PosterCreatorProps) {
   const [error, setError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState<'png' | 'pdf' | 'all-png' | 'pdf-carousel' | null>(null);
   const [resultMode, setResultMode] = useState<'single' | 'carousel'>('single');
+  const [isCarouselPreview, setIsCarouselPreview] = useState(false); // True when only first slides are shown
+  const [totalSlides, setTotalSlides] = useState(5); // Total slides for carousel completion
+  const [carouselProfile, setCarouselProfile] = useState<any>(null); // Store profile for completion
 
   // Current selected poster (single mode) or slide (carousel mode)
   const poster = resultMode === 'carousel'
@@ -116,11 +120,19 @@ export default function PosterCreator({ onBack }: PosterCreatorProps) {
         setSelectedVariant(0);
         setSelectedSlide(0);
         setPosters([]); // Clear single mode posters
+        // Check if this is preview-only (first slides only)
+        setIsCarouselPreview(data.previewOnly || false);
+        setTotalSlides(data.totalSlides || slideCount);
+        // Store profile for completion API
+        if (data.carousels[0]?.[0]?.topmateProfile) {
+          setCarouselProfile(data.carousels[0][0].topmateProfile);
+        }
       } else {
         // Single mode: data.posters is array of variant posters
         setPosters(data.posters);
         setSelectedIndex(0);
         setCarousels([]); // Clear carousel data
+        setIsCarouselPreview(false);
       }
       setResultMode(data.mode || 'single');
     } catch (err) {
@@ -263,6 +275,49 @@ export default function PosterCreator({ onBack }: PosterCreatorProps) {
       setError(err instanceof Error ? err.message : 'Export failed');
     } finally {
       setIsExporting(null);
+    }
+  };
+
+  // Complete carousel - generate remaining slides for selected variant
+  const handleCompleteCarousel = async () => {
+    if (!isCarouselPreview || carousels.length === 0) return;
+
+    const selectedFirstSlide = carousels[selectedVariant]?.[0];
+    if (!selectedFirstSlide) return;
+
+    setIsCompletingCarousel(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/complete-carousel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstSlide: selectedFirstSlide.html,
+          prompt: prompt.trim(),
+          profile: carouselProfile || selectedFirstSlide.topmateProfile,
+          totalSlides: totalSlides,
+          variantIndex: selectedVariant,
+          size: 'instagram-square',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to complete carousel');
+      }
+
+      // Update the selected carousel with all slides
+      const newCarousels = [...carousels];
+      newCarousels[selectedVariant] = data.slides;
+      setCarousels(newCarousels);
+      setIsCarouselPreview(false);
+      setSelectedSlide(0);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to complete carousel');
+    } finally {
+      setIsCompletingCarousel(false);
     }
   };
 
@@ -582,9 +637,9 @@ export default function PosterCreator({ onBack }: PosterCreatorProps) {
             {resultMode === 'single' && posters.length > 1 && (
               <div className="mt-4">
                 <p className="text-sm text-slate-500 mb-2">Choose a variation:</p>
-                <div className="grid gap-2 grid-cols-4">
+                <div className="grid gap-2 grid-cols-3">
                   {posters.map((p, index) => {
-                    const thumbScale = 0.08;
+                    const thumbScale = 0.1;
                     return (
                       <button
                         key={index}
@@ -615,7 +670,7 @@ export default function PosterCreator({ onBack }: PosterCreatorProps) {
                           selectedIndex === index ? 'opacity-100' : 'opacity-0 hover:opacity-100'
                         } transition-opacity`}>
                           <span className="text-white text-xs font-medium">
-                            {['A', 'B', 'C', 'D'][index]}
+                            {['A', 'B', 'C'][index]}
                           </span>
                         </div>
                       </button>
@@ -628,9 +683,42 @@ export default function PosterCreator({ onBack }: PosterCreatorProps) {
             {/* Carousel Mode: Variant Selection + Slide Thumbnails */}
             {resultMode === 'carousel' && carousels.length > 0 && (
               <div className="mt-4 space-y-4">
-                {/* Variant Selection (A, B, C, D) */}
+                {/* Preview Mode Notice + Complete Button */}
+                {isCarouselPreview && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <p className="text-sm text-amber-800 mb-3">
+                      <strong>Preview mode:</strong> Pick your favorite style, then generate all {totalSlides} slides.
+                    </p>
+                    <button
+                      onClick={handleCompleteCarousel}
+                      disabled={isCompletingCarousel}
+                      className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-lg hover:from-amber-600 hover:to-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                    >
+                      {isCompletingCarousel ? (
+                        <>
+                          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Generating {totalSlides} slides...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                          Generate Full Carousel ({totalSlides} slides)
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {/* Variant Selection (A, B, C) */}
                 <div>
-                  <p className="text-sm text-slate-500 mb-2">Style Variant:</p>
+                  <p className="text-sm text-slate-500 mb-2">
+                    {isCarouselPreview ? 'Choose a style:' : 'Style Variant:'}
+                  </p>
                   <div className="flex gap-2">
                     {carousels.map((_, variantIdx) => (
                       <button
@@ -645,13 +733,14 @@ export default function PosterCreator({ onBack }: PosterCreatorProps) {
                             : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                       >
-                        {['A', 'B', 'C', 'D'][variantIdx]}
+                        {['A', 'B', 'C'][variantIdx]}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Slide Thumbnails for Selected Variant */}
+                {/* Slide Thumbnails for Selected Variant (only show if not preview or has multiple slides) */}
+                {(!isCarouselPreview || currentCarouselSlides.length > 1) && (
                 <div>
                   <p className="text-sm text-slate-500 mb-2">Slides:</p>
                   <div className="grid gap-2 grid-cols-5">
@@ -695,6 +784,7 @@ export default function PosterCreator({ onBack }: PosterCreatorProps) {
                     })}
                   </div>
                 </div>
+                )}
               </div>
             )}
           </div>

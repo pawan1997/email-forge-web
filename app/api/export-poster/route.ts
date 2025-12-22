@@ -63,6 +63,18 @@ export async function POST(request: NextRequest) {
 
     const page = await browser.newPage();
 
+    // Set a request timeout to avoid hanging on slow resources
+    await page.setRequestInterception(true);
+    page.on('request', (req) => {
+      // Abort requests that might hang (like analytics, tracking)
+      const url = req.url();
+      if (url.includes('google-analytics') || url.includes('facebook') || url.includes('twitter')) {
+        req.abort();
+      } else {
+        req.continue();
+      }
+    });
+
     // Handle multi-page PDF for carousel
     if (format === 'pdf-multi') {
       const htmlArray = html as string[];
@@ -74,10 +86,11 @@ export async function POST(request: NextRequest) {
       for (let i = 0; i < htmlArray.length; i++) {
         await page.setViewport({ width, height, deviceScaleFactor: 1 });
         await page.setContent(htmlArray[i], {
-          waitUntil: ['load', 'networkidle0'],
-          timeout: 30000,
+          waitUntil: 'domcontentloaded',
+          timeout: 15000,
         });
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Wait for fonts and images to render
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
         // Take screenshot
         const screenshot = await page.screenshot({
@@ -123,14 +136,14 @@ export async function POST(request: NextRequest) {
       deviceScaleFactor: format === 'png' ? scale : 1,
     });
 
-    // Set content and wait for fonts/images to load
+    // Set content and wait for DOM to be ready
     await page.setContent(html, {
-      waitUntil: ['load', 'networkidle0'],
-      timeout: 30000,
+      waitUntil: 'domcontentloaded',
+      timeout: 15000,
     });
 
-    // Wait a bit extra for any web fonts to render
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Wait for fonts and images to render
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     let buffer: Uint8Array;
     let contentType: string;
