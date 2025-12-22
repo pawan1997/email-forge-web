@@ -3,6 +3,7 @@ import puppeteerCore from 'puppeteer-core';
 import puppeteer from 'puppeteer';
 import chromium from '@sparticuz/chromium-min';
 import { PDFDocument } from 'pdf-lib';
+import sharp from 'sharp';
 
 // Check if running in production/serverless environment
 const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL;
@@ -65,13 +66,11 @@ export async function POST(request: NextRequest) {
     // Handle multi-page PDF for carousel
     if (format === 'pdf-multi') {
       const htmlArray = html as string[];
-      const pdfWidth = width / 96; // Convert px to inches (96 DPI)
-      const pdfHeight = height / 96;
 
-      // Create merged PDF document
-      const mergedPdf = await PDFDocument.create();
+      // Create PDF document for all slides
+      const pdfDoc = await PDFDocument.create();
 
-      // Generate PDF for each slide and merge
+      // Generate compressed image for each slide and add to PDF
       for (let i = 0; i < htmlArray.length; i++) {
         await page.setViewport({ width, height, deviceScaleFactor: 1 });
         await page.setContent(htmlArray[i], {
@@ -80,29 +79,39 @@ export async function POST(request: NextRequest) {
         });
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        const slideBuffer = await page.pdf({
-          width: `${pdfWidth}in`,
-          height: `${pdfHeight}in`,
-          printBackground: true,
-          margin: { top: 0, right: 0, bottom: 0, left: 0 },
+        // Take screenshot
+        const screenshot = await page.screenshot({
+          type: 'png',
+          fullPage: false,
+          omitBackground: false,
         });
 
-        // Load the slide PDF and copy its page to merged doc
-        const slidePdf = await PDFDocument.load(slideBuffer);
-        const [copiedPage] = await mergedPdf.copyPages(slidePdf, [0]);
-        mergedPdf.addPage(copiedPage);
+        // Compress as JPEG
+        const compressedImage = await sharp(screenshot)
+          .jpeg({ quality: 85 })
+          .toBuffer();
+
+        // Embed in PDF
+        const jpgImage = await pdfDoc.embedJpg(compressedImage);
+        const pdfPage = pdfDoc.addPage([width, height]);
+        pdfPage.drawImage(jpgImage, {
+          x: 0,
+          y: 0,
+          width: width,
+          height: height,
+        });
       }
 
-      const mergedBuffer = await mergedPdf.save();
+      const pdfBuffer = await pdfDoc.save();
 
       await browser.close();
       browser = null;
 
-      return new NextResponse(Buffer.from(mergedBuffer), {
+      return new NextResponse(Buffer.from(pdfBuffer), {
         headers: {
           'Content-Type': 'application/pdf',
           'Content-Disposition': `attachment; filename="carousel-${htmlArray.length}-slides.pdf"`,
-          'Content-Length': mergedBuffer.byteLength.toString(),
+          'Content-Length': pdfBuffer.byteLength.toString(),
         },
       });
     }
@@ -137,16 +146,31 @@ export async function POST(request: NextRequest) {
       contentType = 'image/png';
       filename = `poster-${width}x${height}@${scale}x.png`;
     } else {
-      // PDF with exact dimensions
-      const pdfWidth = width / 96; // Convert px to inches (96 DPI)
-      const pdfHeight = height / 96;
-
-      buffer = await page.pdf({
-        width: `${pdfWidth}in`,
-        height: `${pdfHeight}in`,
-        printBackground: true,
-        margin: { top: 0, right: 0, bottom: 0, left: 0 },
+      // PDF: Take screenshot, compress with sharp, embed in PDF
+      // This creates much smaller PDFs than Puppeteer's page.pdf()
+      const screenshot = await page.screenshot({
+        type: 'png',
+        fullPage: false,
+        omitBackground: false,
       });
+
+      // Compress the screenshot as JPEG (85% quality for good balance)
+      const compressedImage = await sharp(screenshot)
+        .jpeg({ quality: 85 })
+        .toBuffer();
+
+      // Create PDF and embed the compressed image
+      const pdfDoc = await PDFDocument.create();
+      const jpgImage = await pdfDoc.embedJpg(compressedImage);
+      const page_pdf = pdfDoc.addPage([width, height]);
+      page_pdf.drawImage(jpgImage, {
+        x: 0,
+        y: 0,
+        width: width,
+        height: height,
+      });
+
+      buffer = await pdfDoc.save();
       contentType = 'application/pdf';
       filename = `poster-${width}x${height}.pdf`;
     }
