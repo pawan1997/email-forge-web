@@ -9,6 +9,7 @@ import {
   POSTER_SIZE_DIMENSIONS,
   GeneratedPoster,
 } from '../types/poster';
+import { TEMPLATE_IMAGES } from '../lib/templates';
 
 // API key is now handled server-side via environment variables
 
@@ -21,6 +22,8 @@ export default function PosterCreator({ onBack }: PosterCreatorProps) {
   const [topmateUsername, setTopmateUsername] = useState('');
   const [prompt, setPrompt] = useState('');
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
+  const [referenceSource, setReferenceSource] = useState<'upload' | 'template' | null>(null);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [mode, setMode] = useState<PosterMode>('single');
   const [slideCount, setSlideCount] = useState(5);
   const [selectedModel, setSelectedModel] = useState<'pro' | 'flash'>('pro');
@@ -64,6 +67,7 @@ export default function PosterCreator({ onBack }: PosterCreatorProps) {
     const reader = new FileReader();
     reader.onload = (event) => {
       setReferenceImage(event.target?.result as string);
+      setReferenceSource('upload');
     };
     reader.readAsDataURL(file);
   };
@@ -71,6 +75,14 @@ export default function PosterCreator({ onBack }: PosterCreatorProps) {
   // Clear reference image
   const clearReferenceImage = () => {
     setReferenceImage(null);
+    setReferenceSource(null);
+  };
+
+  // Select template image
+  const handleSelectTemplate = (url: string) => {
+    setReferenceImage(url);
+    setReferenceSource('template');
+    setShowTemplates(false);
   };
 
   // Generate poster
@@ -374,9 +386,20 @@ export default function PosterCreator({ onBack }: PosterCreatorProps) {
 
             {/* Reference Image */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Design Reference (Optional)
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-slate-700">
+                  Design Reference (Optional)
+                </label>
+                {referenceImage && (
+                  <button
+                    onClick={clearReferenceImage}
+                    className="text-xs text-red-500 hover:text-red-600 font-medium"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
               {referenceImage ? (
                 <div className="relative">
                   <img
@@ -384,28 +407,61 @@ export default function PosterCreator({ onBack }: PosterCreatorProps) {
                     alt="Reference"
                     className="w-full h-48 object-cover rounded-lg border border-slate-200"
                   />
-                  <button
-                    onClick={clearReferenceImage}
-                    className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                  <div className="absolute top-2 left-2 px-2 py-1 bg-black/60 text-white text-xs rounded">
+                    {referenceSource === 'template' ? 'Template' : 'Custom Upload'}
+                  </div>
                 </div>
               ) : (
-                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-indigo-500 hover:bg-indigo-50 transition-colors">
-                  <svg className="w-8 h-8 text-slate-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <span className="text-sm text-slate-500">Upload reference image</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                </label>
+                <div className="space-y-3">
+                  {/* Upload Option */}
+                  <label className="flex items-center gap-3 w-full p-3 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-indigo-500 hover:bg-indigo-50 transition-colors">
+                    <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    <span className="text-sm text-slate-600">Upload your own image</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                  </label>
+
+                  {/* Template Toggle */}
+                  <button
+                    onClick={() => setShowTemplates(!showTemplates)}
+                    className="flex items-center justify-between w-full p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                      </svg>
+                      <span className="text-sm text-slate-600">Choose from templates</span>
+                    </div>
+                    <svg className={`w-5 h-5 text-slate-400 transition-transform ${showTemplates ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {/* Template Gallery */}
+                  {showTemplates && (
+                    <div className="grid grid-cols-4 gap-2 max-h-64 overflow-y-auto p-1">
+                      {TEMPLATE_IMAGES.map((template) => (
+                        <button
+                          key={template.id}
+                          onClick={() => handleSelectTemplate(template.url)}
+                          className="aspect-square rounded-lg overflow-hidden border-2 border-transparent hover:border-indigo-500 transition-all hover:scale-105"
+                        >
+                          <img
+                            src={template.url}
+                            alt={template.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
