@@ -450,12 +450,17 @@ export default function PosterCreator({ onBack }: PosterCreatorProps) {
                         <button
                           key={template.id}
                           onClick={() => handleSelectTemplate(template.url)}
-                          className="aspect-square rounded-lg overflow-hidden border-2 border-transparent hover:border-indigo-500 transition-all hover:scale-105"
+                          className="aspect-square rounded-lg overflow-hidden border-2 border-transparent hover:border-indigo-500 transition-all hover:scale-105 bg-slate-100"
                         >
                           <img
                             src={template.url}
                             alt={template.name}
+                            loading="lazy"
                             className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                            }}
                           />
                         </button>
                       ))}
