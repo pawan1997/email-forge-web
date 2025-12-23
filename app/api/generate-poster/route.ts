@@ -738,8 +738,20 @@ async function callOpenRouter(
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    console.error('OpenRouter error:', response.status, errorData);
+    // Try to get error as text first, then parse as JSON if possible
+    const errorText = await response.text().catch(() => '');
+    console.error('OpenRouter error:', response.status, errorText);
+
+    let errorMessage = `OpenRouter API error (${response.status})`;
+    try {
+      const errorData = JSON.parse(errorText);
+      errorMessage = errorData.error?.message || errorMessage;
+    } catch {
+      // If not JSON, use the raw text (truncated)
+      if (errorText) {
+        errorMessage = errorText.slice(0, 200);
+      }
+    }
 
     if (response.status === 401) {
       throw new Error('OpenRouter API key is invalid or expired.');
@@ -750,12 +762,21 @@ async function callOpenRouter(
     if (response.status === 429) {
       throw new Error('OpenRouter rate limit exceeded. Please try again later.');
     }
+    if (response.status === 413) {
+      throw new Error('Request too large. Try using a smaller reference image.');
+    }
 
-    throw new Error(errorData.error?.message || `OpenRouter API error (${response.status})`);
+    throw new Error(errorMessage);
   }
 
-  const data = await response.json();
-  return data.choices[0]?.message?.content || '';
+  const responseText = await response.text();
+  try {
+    const data = JSON.parse(responseText);
+    return data.choices[0]?.message?.content || '';
+  } catch {
+    console.error('Failed to parse OpenRouter response:', responseText.slice(0, 500));
+    throw new Error('Invalid response from OpenRouter: ' + responseText.slice(0, 100));
+  }
 }
 
 // Creative Director orchestrator - analyzes content and returns design direction
