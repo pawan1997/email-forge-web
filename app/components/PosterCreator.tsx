@@ -78,11 +78,31 @@ export default function PosterCreator({ onBack }: PosterCreatorProps) {
     setReferenceSource(null);
   };
 
-  // Select template image
-  const handleSelectTemplate = (url: string) => {
-    setReferenceImage(url);
-    setReferenceSource('template');
+  // Select template image - fetch and convert to base64 for API compatibility
+  const handleSelectTemplate = async (url: string) => {
     setShowTemplates(false);
+    setError(null);
+
+    try {
+      // Fetch the image and convert to base64
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to load template image');
+
+      const blob = await response.blob();
+      const reader = new FileReader();
+
+      reader.onload = (event) => {
+        setReferenceImage(event.target?.result as string);
+        setReferenceSource('template');
+      };
+      reader.onerror = () => {
+        setError('Failed to load template image');
+      };
+      reader.readAsDataURL(blob);
+    } catch (err) {
+      console.error('Template load error:', err);
+      setError('Failed to load template image. Try uploading instead.');
+    }
   };
 
   // Generate poster
